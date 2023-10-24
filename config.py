@@ -9,3 +9,4 @@ IMAP_URL: str = "imap.gmail.com"
 EMAIL: str = os.getenv("EMAIL")
 PASSWORD: str = os.getenv("PASSWORD")
 LOOKUP_STRING: str = "невада"
+LABEL: str = "SamberiChecks"
