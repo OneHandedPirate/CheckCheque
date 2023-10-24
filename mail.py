@@ -6,73 +6,88 @@ from email.message import Message
 
 from bs4 import BeautifulSoup
 
-from config import DATE_FORMAT, EMAIL, IMAP_URL, LOOKUP_STRING, PASSWORD
+from config import DATE_FORMAT, EMAIL, IMAP_URL, LABEL, LOOKUP_STRING, PASSWORD
 
 
-class MailConnection:
-    def __init__(self):
+class Mail:
+    def __init__(self) -> None:
         self.email: str = EMAIL
         self.password: str = PASSWORD
         self.connection: imaplib.IMAP4_SSL | None = None
 
-    def __enter__(self):
+    def __enter__(self) -> "Mail":
         self._login()
         return self
 
-    def __exit__(self, exc_type, exc_value, trace):
+    def __exit__(self, exc_type, exc_value, trace) -> None:
         self._logout()
 
-    def _login(self):
+    def _login(self) -> None:
         self.connection = imaplib.IMAP4_SSL(IMAP_URL)
         self.connection.login(self.email, self.password)
 
-    def _logout(self):
+    def _logout(self) -> None:
         self.connection.logout()
 
-    def _select_mailbox(self, mailbox: str):
+    def _select_mailbox(self, mailbox: str) -> None:
         self.connection.select(mailbox)
 
-    def _search(self, criteria: str, mailbox="Inbox"):
-        """Returns concatenated string of email uids ready to be put into fetch"""
-        self._select_mailbox(mailbox)
+    def _search(self, criteria: str, folder: str) -> str | bool:
+        """
+        search for messages matching the given criteria in the given folder
+        returns uid-ready concatenated string of email uids or None
+        """
+        self._select_mailbox(folder)
 
         status, data = self.connection.uid("search", criteria)
         if status == "OK":
-            return ",".join(data[0].decode().split()) if data[0] else None
-        return
+            return ",".join(data[0].decode().split()) if data[0] else False
+        return False
 
-    def _fetch(self, uids: str, message_parts: str):
+    def _fetch(self, uids: str, message_parts: str) -> list | bool:
         status, data = self.connection.uid("fetch", uids, message_parts)
         if status == "OK":
             return data
-        return
+        return False
 
-    def _change_seen_status(self, uids: str, status: bool):
-        typ, response = self.connection.uid(
-            "store", uids, f"{'+' if status else '-'}X-GM-LABELS", "SamberiChecks"
-        )
-        return typ
+    def _add_label(self, uids: str) -> bool:
+        typ, response = self.connection.uid("store", uids, "+X-GM-LABELS", LABEL)
+        return typ == "OK"
 
-    def process_new_checks(self) -> list[tuple] | None:
+    def _make_seen(self, uids: str) -> bool:
+        typ, response = self.connection.uid("STORE", uids, "+FLAGS", "\\Seen")
+        return typ == "OK"
+
+    def process_checks(
+        self, criteria: str, folder: str = "Inbox"
+    ) -> list[tuple] | None:
         """
         search for new checks in Inbox
         returns list of new db-insert-ready items
         """
         res = []
         with self as conn:
-            email_uids = conn._search("UNSEEN")
+            email_uids = conn._search(criteria, folder)
             if email_uids:
-                data = conn._fetch(email_uids, "(BODY.PEEK[])")
-                for letter in data:
-                    if isinstance(letter, tuple):
-                        raw_email: bytes = letter[1]
-                        email_message = email.message_from_bytes(raw_email)
-                        decoded_subject = decode_header(email_message["Subject"])[0][0]
-                        if (
-                            isinstance(decoded_subject, bytes)
-                            and LOOKUP_STRING in decoded_subject.decode().lower()
-                        ):
-                            res += self._process_check(email_message)
+                try:
+                    data = conn._fetch(email_uids, "(BODY.PEEK[])")
+                    for letter in data:
+                        if isinstance(letter, tuple):
+                            raw_email: bytes = letter[1]
+                            email_message = email.message_from_bytes(raw_email)
+                            decoded_subject = decode_header(email_message["Subject"])[
+                                0
+                            ][0]
+                            if (
+                                isinstance(decoded_subject, bytes)
+                                and LOOKUP_STRING in decoded_subject.decode().lower()
+                            ):
+                                res += self._process_check(email_message)
+                except Exception as e:
+                    print(f"Error occurred: {e}")
+                else:
+                    self._add_label(email_uids)
+                    self._make_seen(email_uids)
 
         return res if res else None
 
@@ -80,13 +95,12 @@ class MailConnection:
     def _process_check(email_message: Message) -> list[tuple]:
         """
         Process individual email with check
-        return list of tuples with items
+        return list of item tuples
         """
         res = []
-
         for part in email_message.get_payload():
             if part.get_content_type() == "text/html":
-                html_content: str = (
+                html_content = (
                     part.get_payload(decode=True).decode().replace("\r\n", "")
                 )
                 bs = BeautifulSoup(html_content, "lxml")
@@ -94,7 +108,7 @@ class MailConnection:
                 date = table.find("td", attrs={"colspan": "2"})
                 date_string = " ".join(date.text.split()[-2:])
                 dt = datetime.strptime(date_string, DATE_FORMAT)
-                formatted_date = dt.strftime("%Y-%m-%d")
+                formatted_date = dt.strftime("%Y-%m-%d %H:%M")
 
                 items = table.find_all("tr")
                 filtered_items = [item for item in items if len(item.contents) == 7]
@@ -102,6 +116,6 @@ class MailConnection:
                     tds = item.find_all("td")
                     name = tds[1].text.strip()
                     price = tds[2].text.strip().replace(",", ".")
-                    amount = tds[3].text.strip().replace(",", ".")
+                    amount = tds[3].text.strip().replace(",", ".").replace("&nbsp", "")
                     res.append((name, price, amount, formatted_date))
         return res
