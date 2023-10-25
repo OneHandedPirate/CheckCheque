@@ -6,9 +6,10 @@ authors = ["onehandedpirate <plagueismkii@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.11"
 lxml = "^4.9.3"
 beautifulsoup4 = "^4.12.2"
+aiogram = "^3.1.1"
 
 
 [tool.poetry.group.dev.dependencies]

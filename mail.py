@@ -35,7 +35,7 @@ class Mail:
     def _search(self, criteria: str, folder: str) -> str | bool:
         """
         search for messages matching the given criteria in the given folder
-        returns uid-ready concatenated string of email uids or None
+        returns uid-ready concatenated string of email uids or False
         """
         self._select_mailbox(folder)
 
@@ -60,36 +60,40 @@ class Mail:
 
     def process_checks(
         self, criteria: str, folder: str = "Inbox"
-    ) -> list[tuple] | None:
+    ) -> list[tuple] | None | bool:
         """
         search for new checks in Inbox
         returns list of new db-insert-ready items
         """
         res = []
         with self as conn:
-            email_uids = conn._search(criteria, folder)
-            if email_uids:
-                try:
-                    data = conn._fetch(email_uids, "(BODY.PEEK[])")
-                    for letter in data:
-                        if isinstance(letter, tuple):
-                            raw_email: bytes = letter[1]
-                            email_message = email.message_from_bytes(raw_email)
-                            decoded_subject = decode_header(email_message["Subject"])[
-                                0
-                            ][0]
-                            if (
-                                isinstance(decoded_subject, bytes)
-                                and LOOKUP_STRING in decoded_subject.decode().lower()
-                            ):
-                                res += self._process_check(email_message)
-                except Exception as e:
-                    print(f"Error occurred: {e}")
-                else:
-                    self._add_label(email_uids)
-                    self._make_seen(email_uids)
 
-        return res if res else None
+            email_uids = conn._search(criteria, folder)
+            if not email_uids:
+                return None
+
+            try:
+                data = conn._fetch(email_uids, "(BODY.PEEK[])")
+                for letter in data:
+                    if not isinstance(letter, tuple):
+                        continue
+                    raw_email: bytes = letter[1]
+                    email_message = email.message_from_bytes(raw_email)
+                    decoded_subject = decode_header(email_message["Subject"])[0][0]
+                    if (
+                        isinstance(decoded_subject, bytes)
+                        and LOOKUP_STRING in decoded_subject.decode().lower()
+                    ):
+                        res += self._process_check(email_message)
+            except Exception as e:
+                print(f"Error occurred: {e}")
+                return False
+            else:
+                if folder == "Inbox":
+                    self._add_label(email_uids)
+                if criteria == "UNSEEN":
+                    self._make_seen(email_uids)
+                return res if res else None
 
     @staticmethod
     def _process_check(email_message: Message) -> list[tuple]:
@@ -99,23 +103,29 @@ class Mail:
         """
         res = []
         for part in email_message.get_payload():
-            if part.get_content_type() == "text/html":
-                html_content = (
-                    part.get_payload(decode=True).decode().replace("\r\n", "")
+            if not part.get_content_type() == "text/html":
+                continue
+            html_content = part.get_payload(decode=True).decode().replace("\r\n", "")
+            bs = BeautifulSoup(html_content, "lxml")
+            table = bs.find("table", attrs={"cellpadding": "3"})
+            date = table.find("td", attrs={"colspan": "2"})
+            date_string = " ".join(date.text.split()[-2:])
+            dt = datetime.strptime(date_string, DATE_FORMAT)
+            formatted_date = dt.strftime("%Y-%m-%d %H:%M")
+            items = table.find_all("tr")
+            filtered_items = [item for item in items if len(item.contents) == 7]
+            for item in filtered_items:
+                tds = item.find_all("td")
+                name = tds[1].text.strip()
+                price = tds[2].text.strip().replace(",", ".").replace(" ", "")
+                amount = tds[3].text.strip().replace(",", ".")
+                res.append(
+                    (
+                        name,
+                        price,
+                        amount,
+                        round(float(price) * float(amount), 2),
+                        formatted_date,
+                    )
                 )
-                bs = BeautifulSoup(html_content, "lxml")
-                table = bs.find("table", attrs={"cellpadding": "3"})
-                date = table.find("td", attrs={"colspan": "2"})
-                date_string = " ".join(date.text.split()[-2:])
-                dt = datetime.strptime(date_string, DATE_FORMAT)
-                formatted_date = dt.strftime("%Y-%m-%d %H:%M")
-
-                items = table.find_all("tr")
-                filtered_items = [item for item in items if len(item.contents) == 7]
-                for item in filtered_items:
-                    tds = item.find_all("td")
-                    name = tds[1].text.strip()
-                    price = tds[2].text.strip().replace(",", ".")
-                    amount = tds[3].text.strip().replace(",", ".").replace("&nbsp", "")
-                    res.append((name, price, amount, formatted_date))
         return res
