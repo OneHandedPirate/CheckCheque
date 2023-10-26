@@ -74,7 +74,8 @@ class Mail:
 
             try:
                 data = conn._fetch(email_uids, "(BODY.PEEK[])")
-                for letter in data:
+                processed_indx = []
+                for indx, letter in enumerate(data):
                     if not isinstance(letter, tuple):
                         continue
                     raw_email: bytes = letter[1]
@@ -84,15 +85,20 @@ class Mail:
                         isinstance(decoded_subject, bytes)
                         and LOOKUP_STRING in decoded_subject.decode().lower()
                     ):
+                        processed_indx.append(indx // 2)
                         res += self._process_check(email_message)
             except Exception as e:
                 print(f"Error occurred: {e}")
                 return False
             else:
-                if folder == "Inbox":
-                    self._add_label(email_uids)
-                if criteria == "UNSEEN":
-                    self._make_seen(email_uids)
+                if processed_indx:
+                    processed_uids = ",".join(
+                        [email_uids.split(",")[indx] for indx in processed_indx]
+                    )
+                    if folder == "Inbox":
+                        self._add_label(processed_uids)
+                    if criteria == "UNSEEN":
+                        self._make_seen(processed_uids)
                 return res if res else None
 
     @staticmethod
