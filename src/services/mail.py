@@ -6,27 +6,21 @@ from email.message import Message
 
 from bs4 import BeautifulSoup
 
-from config import DATE_FORMAT, EMAIL, IMAP_URL, LABEL, LOOKUP_STRING, PASSWORD
+from src.config import DATE_FORMAT, EMAIL, IMAP_URL, LABEL, LOOKUP_STRING, PASSWORD
 
 
-class Mail:
+class MailService:
     def __init__(self) -> None:
         self.email: str = EMAIL
         self.password: str = PASSWORD
         self.connection: imaplib.IMAP4_SSL | None = None
 
-    def __enter__(self) -> "Mail":
-        self._login()
+    def __enter__(self) -> "MailService":
+        self.connection = imaplib.IMAP4_SSL(IMAP_URL)
+        self.connection.login(self.email, self.password)
         return self
 
     def __exit__(self, exc_type, exc_value, trace) -> None:
-        self._logout()
-
-    def _login(self) -> None:
-        self.connection = imaplib.IMAP4_SSL(IMAP_URL)
-        self.connection.login(self.email, self.password)
-
-    def _logout(self) -> None:
         self.connection.logout()
 
     def _select_mailbox(self, mailbox: str) -> None:
@@ -86,7 +80,7 @@ class Mail:
                         and LOOKUP_STRING in decoded_subject.decode().lower()
                     ):
                         processed_indx.append(indx // 2)
-                        res += self._process_check(email_message)
+                        res += self._parse_email(email_message)
             except Exception as e:
                 print(f"Error occurred: {e}")
                 return False
@@ -99,13 +93,13 @@ class Mail:
                         self._add_label(processed_uids)
                     if criteria == "UNSEEN":
                         self._make_seen(processed_uids)
-                return res if res else None
+                return res or None
 
     @staticmethod
-    def _process_check(email_message: Message) -> list[tuple]:
+    def _parse_email(email_message: Message) -> list[tuple]:
         """
-        Process individual email with check
-        return list of item tuples
+        parse individual email with check
+        return list of item tuples or empty list
         """
         res = []
         for part in email_message.get_payload():
