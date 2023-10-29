@@ -11,20 +11,20 @@ from src.config import DATE_FORMAT, EMAIL, IMAP_URL, LABEL, LOOKUP_STRING, PASSW
 
 class MailService:
     def __init__(self) -> None:
-        self.email: str = EMAIL
-        self.password: str = PASSWORD
-        self.connection: imaplib.IMAP4_SSL | None = None
+        self._email: str = EMAIL
+        self._password: str = PASSWORD
+        self._connection: imaplib.IMAP4_SSL | None = None
 
     def __enter__(self) -> "MailService":
-        self.connection = imaplib.IMAP4_SSL(IMAP_URL)
-        self.connection.login(self.email, self.password)
+        self._connection = imaplib.IMAP4_SSL(IMAP_URL)
+        self._connection.login(self._email, self._password)
         return self
 
     def __exit__(self, exc_type, exc_value, trace) -> None:
-        self.connection.logout()
+        self._connection.logout()
 
     def _select_mailbox(self, mailbox: str) -> None:
-        self.connection.select(mailbox)
+        self._connection.select(mailbox)
 
     def _search(self, criteria: str, folder: str) -> str | bool:
         """
@@ -33,23 +33,23 @@ class MailService:
         """
         self._select_mailbox(folder)
 
-        status, data = self.connection.uid("search", criteria)
+        status, data = self._connection.uid("search", criteria)
         if status == "OK":
             return ",".join(data[0].decode().split()) if data[0] else False
         return False
 
     def _fetch(self, uids: str, message_parts: str) -> list | bool:
-        status, data = self.connection.uid("fetch", uids, message_parts)
+        status, data = self._connection.uid("fetch", uids, message_parts)
         if status == "OK":
             return data
         return False
 
     def _add_label(self, uids: str) -> bool:
-        typ, response = self.connection.uid("store", uids, "+X-GM-LABELS", LABEL)
+        typ, response = self._connection.uid("store", uids, "+X-GM-LABELS", LABEL)
         return typ == "OK"
 
     def _make_seen(self, uids: str) -> bool:
-        typ, response = self.connection.uid("STORE", uids, "+FLAGS", "\\Seen")
+        typ, response = self._connection.uid("STORE", uids, "+FLAGS", "\\Seen")
         return typ == "OK"
 
     def process_checks(

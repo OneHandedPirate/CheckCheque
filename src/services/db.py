@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 from src.config import DB_NAME
@@ -10,25 +11,25 @@ class DBService:
     ItemType = tuple[str, str, str, float, str]
 
     def __init__(self) -> None:
-        self.connection: sqlite3.Connection | None = None
-        self.cursor: sqlite3.Cursor | None = None
+        self._connection: sqlite3.Connection | None = None
+        self._cursor: sqlite3.Cursor | None = None
 
     def __enter__(self) -> "DBService":
-        self.connection = sqlite3.connect(DB_PATH)
-        self.cursor = self.connection.cursor()
+        self._connection = sqlite3.connect(DB_PATH)
+        self._cursor = self._connection.cursor()
         return self
 
     def __exit__(self, exc_type, exc_value, trace) -> None:
-        self.cursor.close()
-        self.connection.close()
+        self._cursor.close()
+        self._connection.close()
 
     def insert_new_items(
         self, items: list[ItemType], initial: bool = False
     ) -> list[ItemType]:
         with self:
             if initial:
-                self.cursor.execute(f"""DROP TABLE IF EXISTS {DB_NAME};""")
-                self.cursor.execute(
+                self._cursor.execute(f"""DROP TABLE IF EXISTS {DB_NAME};""")
+                self._cursor.execute(
                     f"""
                     CREATE TABLE IF NOT EXISTS {DB_NAME} (
                     id INTEGER PRIMARY KEY,
@@ -42,7 +43,7 @@ class DBService:
 
             self._insert(items, bulk=True)
 
-            self.connection.commit()
+            self._connection.commit()
 
             return items
 
@@ -51,16 +52,50 @@ class DBService:
         return f"""INSERT INTO {DB_NAME} (name, price, amount, total, created_at) VALUES (?, ?, ?, ?, ?)"""
 
     @staticmethod
-    def _statistics_query() -> str:
+    def _week_statistics_query() -> str:
         return f"""
-        SELECT (name, price, amount, total, created_at)
-        FROM {DB_NAME} WHERE strftime(?, created_at) = strftime(?, 'now')"""
+        SELECT name, price, amount, total, created_at
+        FROM {DB_NAME} WHERE strftime('%Y-%W', created_at) = strftime('%Y-%W', 'now')"""
+
+    @staticmethod
+    def _month_statistics_query() -> str:
+        pass
+
+    @staticmethod
+    def _year_statistics_query() -> str:
+        return f"""SELECT
+                    ROUND(SUM(price), 2),
+                    COUNT(DISTINCT created_at),
+                    strftime('%m', created_at)
+                    FROM {DB_NAME}
+                    WHERE strftime('%Y', created_at) = ?
+                    GROUP BY strftime('%m', created_at);"""
 
     def _insert(self, items: list[ItemType] | ItemType, bulk: bool = False) -> None:
         if bulk:
-            self.cursor.executemany(self._insert_query(), items)
+            self._cursor.executemany(self._insert_query(), items)
         else:
-            self.cursor.execute(self._insert_query(), items)
+            self._cursor.execute(self._insert_query(), items)
 
-    def get_statistics(self, timespan: str):
-        pass
+    def get_week_statistics(self):
+        with self:
+            self._cursor.execute(self._week_statistics_query())
+            return self._cursor.fetchall()
+
+    def get_year_statistics(self):
+        with self:
+            query = self._year_statistics_query()
+            period = (str(datetime.now().year),)
+            self._cursor.execute(query, period)
+            return self._cursor.fetchall()
+
+    def get_month_statistics(self):
+        with self:
+            query = """
+            SELECT name, SUM(amount), Round(SUM(total), 2)
+            FROM pokupochki
+            WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
+            GROUP BY name
+            ORDER BY 3 DESC;"""
+            self._cursor.execute(query)
+            return self._cursor.fetchall()

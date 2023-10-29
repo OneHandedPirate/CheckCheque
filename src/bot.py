@@ -14,7 +14,9 @@ from src.services.utils import (
     check_new_checks,
     get_last_check,
     initial_process,
-    statistics,
+    month_stats,
+    week_stats,
+    year_stats,
 )
 
 dp = Dispatcher()
@@ -39,7 +41,8 @@ async def last_check_handler(message: types.Message) -> None:
             await message.answer(f"Hello, {message.from_user.id}! Access denied")
         else:
             res = get_last_check()
-            await message.reply(f"{res[0]}\n\n{res[1]}")
+            date, time = res[0].split()
+            await message.reply(f"🗓️{date}\n🕓{time}\n\n{res[1]}")
 
     except TypeError:
         # But not all the types is supported to be copied so need to handle it
@@ -70,13 +73,38 @@ async def download_db(message: types.Message) -> None:
             )
 
 
-@dp.message(Command("stats"))
-async def stats(message: types.Message) -> None:
+@dp.message(Command("year"))
+async def year(message: types.Message) -> None:
     try:
         if message.from_user.id not in ALLOWED_USERS:
             await message.answer(f"Hello, {message.from_user.id}! Access denied")
         else:
-            await message.reply(statistics("%Y"))
+
+            await message.reply(year_stats())
+
+    except TypeError:
+        await message.answer("Nice try!")
+
+
+@dp.message(Command("week"))
+async def week(message: types.Message) -> None:
+    try:
+        if message.from_user.id not in ALLOWED_USERS:
+            await message.answer(f"Hello, {message.from_user.id}! Access denied")
+        else:
+            await message.reply(week_stats())
+
+    except TypeError:
+        await message.answer("Nice try!")
+
+
+@dp.message(Command("month"))
+async def month(message: types.Message) -> None:
+    try:
+        if message.from_user.id not in ALLOWED_USERS:
+            await message.answer(f"Hello, {message.from_user.id}! Access denied")
+        else:
+            await message.reply(month_stats())
 
     except TypeError:
         await message.answer("Nice try!")
