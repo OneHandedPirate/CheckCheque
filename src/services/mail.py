@@ -6,7 +6,7 @@ from email.message import Message
 
 from bs4 import BeautifulSoup
 
-from src.config import DATE_FORMAT, EMAIL, IMAP_URL, LABEL, LOOKUP_STRING, PASSWORD
+from src.config import DATE_FORMAT, EMAIL, IMAP_URL, LABEL, LOOKUP_STRINGS, PASSWORD
 
 
 class MailService:
@@ -16,8 +16,11 @@ class MailService:
         self._connection: imaplib.IMAP4_SSL | None = None
 
     def __enter__(self) -> "MailService":
-        self._connection = imaplib.IMAP4_SSL(IMAP_URL)
-        self._connection.login(self._email, self._password)
+        try:
+            self._connection = imaplib.IMAP4_SSL(IMAP_URL)
+            self._connection.login(self._email, self._password)
+        except Exception as e:
+            print(f"Error occured while connecting to {self._email}:{e}")
         return self
 
     def __exit__(self, exc_type, exc_value, trace) -> None:
@@ -61,12 +64,11 @@ class MailService:
         """
         res = []
         with self as conn:
-
-            email_uids = conn._search(criteria, folder)
-            if not email_uids:
-                return None
-
             try:
+                email_uids = conn._search(criteria, folder)
+                if not email_uids:
+                    return None
+
                 data = conn._fetch(email_uids, "(BODY.PEEK[])")
                 processed_indx = []
                 for indx, letter in enumerate(data):
@@ -74,13 +76,12 @@ class MailService:
                         continue
                     raw_email: bytes = letter[1]
                     email_message = email.message_from_bytes(raw_email)
-                    decoded_subject = decode_header(email_message["Subject"])[0][0]
-                    if (
-                        isinstance(decoded_subject, bytes)
-                        and LOOKUP_STRING in decoded_subject.decode().lower()
-                    ):
-                        processed_indx.append(indx // 2)
-                        res += self._parse_email(email_message)
+                    subject = decode_header(email_message["Subject"])[0][0]
+                    if isinstance(subject, bytes):
+                        decoded_subject = subject.decode().lower()
+                        if any(sub in decoded_subject for sub in LOOKUP_STRINGS):
+                            processed_indx.append(indx // 2)
+                            res += self._parse_email(email_message)
             except Exception as e:
                 print(f"Error occurred: {e}")
                 return False
@@ -105,27 +106,32 @@ class MailService:
         for part in email_message.get_payload():
             if not part.get_content_type() == "text/html":
                 continue
-            html_content = part.get_payload(decode=True).decode().replace("\r\n", "")
-            bs = BeautifulSoup(html_content, "lxml")
-            table = bs.find("table", attrs={"cellpadding": "3"})
-            date = table.find("td", attrs={"colspan": "2"})
-            date_string = " ".join(date.text.split()[-2:])
-            dt = datetime.strptime(date_string, DATE_FORMAT)
-            formatted_date = dt.strftime("%Y-%m-%d %H:%M")
-            items = table.find_all("tr")
-            filtered_items = [item for item in items if len(item.contents) == 7]
-            for item in filtered_items:
-                tds = item.find_all("td")
-                name = tds[1].text.strip()
-                price = tds[2].text.strip().replace(",", ".").replace(" ", "")
-                amount = tds[3].text.strip().replace(",", ".")
-                res.append(
-                    (
-                        name,
-                        price,
-                        amount,
-                        round(float(price) * float(amount), 2),
-                        formatted_date,
-                    )
+            try:
+                html_content = (
+                    part.get_payload(decode=True).decode().replace("\r\n", "")
                 )
+                bs = BeautifulSoup(html_content, "lxml")
+                table = bs.find("table", attrs={"cellpadding": "3"})
+                date = table.find("td", attrs={"colspan": "2"})
+                date_string = " ".join(date.text.split()[-2:])
+                dt = datetime.strptime(date_string, DATE_FORMAT)
+                formatted_date = dt.strftime("%Y-%m-%d %H:%M")
+                all_tr = table.find_all("tr")
+                items = [item for item in all_tr if len(item.contents) == 7]
+                for item in items:
+                    tds = item.find_all("td")
+                    name = tds[1].text.strip()
+                    price = tds[2].text.strip().replace(",", ".").replace(" ", "")
+                    amount = tds[3].text.strip().replace(",", ".")
+                    res.append(
+                        (
+                            name,
+                            price,
+                            amount,
+                            round(float(price) * float(amount), 2),
+                            formatted_date,
+                        )
+                    )
+            except Exception as e:
+                print(f"Error occurred while parsing email: {e}")
         return res

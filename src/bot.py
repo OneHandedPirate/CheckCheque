@@ -9,19 +9,11 @@ from aiogram.types import BufferedInputFile, Message
 from aiogram.utils.markdown import hbold
 
 from src.config import ALLOWED_USERS, BOT_TOKEN
-from src.services.mail import MailService
-from src.services.utils import (
-    check_new_checks,
-    get_last_check,
-    initial_process,
-    month_stats,
-    week_stats,
-    year_stats,
-)
+from src.services.main import BotService
 
 dp = Dispatcher()
 
-gmail = MailService()
+bs = BotService()
 
 
 @dp.message(CommandStart())
@@ -40,9 +32,7 @@ async def last_check_handler(message: types.Message) -> None:
         if message.from_user.id not in ALLOWED_USERS:
             await message.answer(f"Hello, {message.from_user.id}! Access denied")
         else:
-            res = get_last_check()
-            date, time = res[0].split()
-            await message.reply(f"🗓️{date}\n🕓{time}\n\n{res[1]}")
+            await message.reply(bs.get_last_check())
 
     except TypeError:
         # But not all the types is supported to be copied so need to handle it
@@ -55,7 +45,7 @@ async def process_new_checks(message: types.Message) -> None:
         if message.from_user.id not in ALLOWED_USERS:
             await message.answer(f"Hello, {message.from_user.id}! Access denied")
         else:
-            await message.reply(check_new_checks(gmail))
+            await message.reply(bs.check_new_checks())
 
     except TypeError:
         await message.answer("Nice try!")
@@ -80,7 +70,7 @@ async def year(message: types.Message) -> None:
             await message.answer(f"Hello, {message.from_user.id}! Access denied")
         else:
 
-            await message.reply(year_stats())
+            await message.reply(bs.get_year_stats())
 
     except TypeError:
         await message.answer("Nice try!")
@@ -92,7 +82,7 @@ async def week(message: types.Message) -> None:
         if message.from_user.id not in ALLOWED_USERS:
             await message.answer(f"Hello, {message.from_user.id}! Access denied")
         else:
-            await message.reply(week_stats())
+            await message.reply(bs.get_week_stats())
 
     except TypeError:
         await message.answer("Nice try!")
@@ -104,7 +94,7 @@ async def month(message: types.Message) -> None:
         if message.from_user.id not in ALLOWED_USERS:
             await message.answer(f"Hello, {message.from_user.id}! Access denied")
         else:
-            await message.reply(month_stats())
+            await message.reply(bs.get_month_stats())
 
     except TypeError:
         await message.answer("Nice try!")
@@ -116,7 +106,7 @@ async def main() -> None:
 
 
 if __name__ == "__main__":
-    initial_process(gmail)
+    bs.initial_process()
 
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
     asyncio.run(main())
