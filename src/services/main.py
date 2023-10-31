@@ -47,7 +47,7 @@ class BotService:
         for indx, item in enumerate(month, 1):
             summ += item[2]
             res += f"<b>{item[0]}</b>\nКоличество: {item[1]}\nСумма: {item[2]}\n\n"
-        res += f"-----------------------------\n<b>Общая сумма</b>: {summ:.2f}"
+        res += f"----------------------------------\n<b>Общая сумма</b>: {summ:.2f}"
         return res
 
     def get_week_stats(self):
