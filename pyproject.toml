@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "samberichecks"
+name = "checkcheque"
 version = "0.1.0"
 description = ""
 authors = ["onehandedpirate <plagueismkii@gmail.com>"]
