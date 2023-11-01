@@ -2,13 +2,18 @@ import asyncio
 import logging
 import sys
 
-from aiogram import Bot, Dispatcher, types
+from aiogram import Bot, Dispatcher, F
 from aiogram.enums import ParseMode
-from aiogram.filters import Command, CommandStart
-from aiogram.types import BufferedInputFile, Message
-from aiogram.utils.markdown import hbold
+from aiogram.filters import Command
+from aiogram.types import BufferedInputFile, CallbackQuery, Message
 
-from src.config import ALLOWED_USERS, BOT_TOKEN
+from src.config import ALLOWED_USERS, BOT_TOKEN, DB_NAME
+from src.services.keyboads import (
+    menu_back_ikb,
+    menu_main_ikb,
+    stats_back_ikb,
+    stats_keyboard_ikb,
+)
 from src.services.main import BotService
 
 dp = Dispatcher()
@@ -16,88 +21,57 @@ dp = Dispatcher()
 bs = BotService()
 
 
-@dp.message(CommandStart())
+@dp.message(Command("start", "menu"))
 async def command_start_handler(message: Message) -> None:
     """
-    This handler receives messages with `/start` command
+    This handler receives messages with /start or /menu command
     """
     if message.from_user.id not in ALLOWED_USERS:
         await message.answer("You are not welcome here!")
-    await message.answer(f"Hello, {hbold(message.from_user.full_name)}!")
+    await message.answer(
+        bs.get_menu(
+            name=message.from_user.full_name,
+            start=True if message.text == "/start" else False,
+        ),
+        reply_markup=menu_main_ikb.as_markup(),
+    )
 
 
-@dp.message(Command("last"))
-async def last_check_handler(message: types.Message) -> None:
-    try:
-        if message.from_user.id not in ALLOWED_USERS:
-            await message.answer(f"Hello, {message.from_user.id}! Access denied")
-        else:
-            await message.reply(bs.get_last_check())
-
-    except TypeError:
-        # But not all the types is supported to be copied so need to handle it
-        await message.answer("Nice try!")
-
-
-@dp.message(Command("process"))
-async def process_new_checks(message: types.Message) -> None:
-    try:
-        if message.from_user.id not in ALLOWED_USERS:
-            await message.answer(f"Hello, {message.from_user.id}! Access denied")
-        else:
-            await message.reply(bs.check_new_checks())
-
-    except TypeError:
-        await message.answer("Nice try!")
-
-
-@dp.message(Command("down"))
-async def download_db(message: types.Message) -> None:
-    if message.from_user.id not in ALLOWED_USERS:
-        await message.answer(f"Hello, {message.from_user.id}! Access denied")
-    else:
-        with open("db/pokupochki.db", "rb") as db_from_buffer:
-            await message.answer_document(
-                BufferedInputFile(db_from_buffer.read(), filename="pokupochki.db"),
-                caption="БД из буфера",
+@dp.callback_query(F.data.startswith("menu_"))
+async def menu_callback(query: CallbackQuery) -> None:
+    menu_item = query.data.split("_")[1]
+    match menu_item:
+        case "process":
+            await query.message.edit_text(
+                bs.check_new_checks(), reply_markup=menu_back_ikb.as_markup()
+            )
+        case "stats":
+            await query.message.edit_text(
+                "Нажмите на кнопку для вывода статистики",
+                reply_markup=stats_keyboard_ikb.as_markup(),
+            )
+        case "last":
+            await query.message.edit_text(
+                bs.get_statistics("last"), reply_markup=menu_back_ikb.as_markup()
+            )
+        case "download":
+            with open("db/pokupochki.db", "rb") as db_from_buffer:
+                await query.message.answer_document(
+                    BufferedInputFile(db_from_buffer.read(), filename=f"{DB_NAME}.db"),
+                    caption="Ваша БД",
+                )
+        case "main":
+            await query.message.edit_text(
+                bs.get_menu(start=False), reply_markup=menu_main_ikb.as_markup()
             )
 
 
-@dp.message(Command("year"))
-async def year(message: types.Message) -> None:
-    try:
-        if message.from_user.id not in ALLOWED_USERS:
-            await message.answer(f"Hello, {message.from_user.id}! Access denied")
-        else:
-
-            await message.reply(bs.get_year_stats())
-
-    except TypeError:
-        await message.answer("Nice try!")
-
-
-@dp.message(Command("week"))
-async def week(message: types.Message) -> None:
-    try:
-        if message.from_user.id not in ALLOWED_USERS:
-            await message.answer(f"Hello, {message.from_user.id}! Access denied")
-        else:
-            await message.reply(bs.get_week_stats())
-
-    except TypeError:
-        await message.answer("Nice try!")
-
-
-@dp.message(Command("month"))
-async def month(message: types.Message) -> None:
-    try:
-        if message.from_user.id not in ALLOWED_USERS:
-            await message.answer(f"Hello, {message.from_user.id}! Access denied")
-        else:
-            await message.reply(bs.get_month_stats())
-
-    except TypeError:
-        await message.answer("Nice try!")
+@dp.callback_query(F.data.startswith("stata_"))
+async def stats_callback(query: CallbackQuery):
+    period = query.data.split("_")[1]
+    await query.message.edit_text(
+        bs.get_statistics(period), reply_markup=stats_back_ikb.as_markup()
+    )
 
 
 async def main() -> None:
