@@ -55,7 +55,7 @@ async def menu_callback(query: CallbackQuery) -> None:
                 bs.get_statistics("last"), reply_markup=menu_back_ikb.as_markup()
             )
         case "download":
-            with open("db/pokupochki.db", "rb") as db_from_buffer:
+            with open(f"db/{DB_NAME}.db", "rb") as db_from_buffer:
                 await query.message.answer_document(
                     BufferedInputFile(db_from_buffer.read(), filename=f"{DB_NAME}.db"),
                     caption="Ваша БД",
@@ -75,12 +75,13 @@ async def stats_callback(query: CallbackQuery):
 
 
 async def main() -> None:
+    bs.initial_process()
+
     bot = Bot(BOT_TOKEN, parse_mode=ParseMode.HTML)
     await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
-    bs.initial_process()
 
     logging.basicConfig(level=logging.INFO, stream=sys.stdout)
     asyncio.run(main())
