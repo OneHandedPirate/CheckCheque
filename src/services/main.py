@@ -24,12 +24,15 @@ class BotService:
     def get_menu(self, start: bool, name: str = "default"):
         return self.render.render_menu(start, name)
 
-    def check_new_checks(self):
-        new_checks = self.mail.process_checks("UNSEEN", "Inbox")
+    def check_new_checks(self) -> str:
+        new_items = self.mail.process_checks("UNSEEN", "Inbox")
 
-        if new_checks:
-            self.db.insert_new_items(new_checks)
-            return f"Обработано новых чеков: {len(set([i[4] for i in new_checks]))}"
+        if new_items:
+            self.db.insert_new_items(new_items)
+            return (
+                f"Обработано новых чеков: {len(set([i[4] for i in new_items]))}\n\n"
+                f"{self.render.render_checks(items=new_items)}"
+            )
         return "Новых чеков нет!"
 
     def get_statistics(self, period: str) -> str:
