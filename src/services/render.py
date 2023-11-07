@@ -1,12 +1,9 @@
 from datetime import datetime
 
-from src.config import DATE_FORMAT
 from src.services import utils
 
 
 class RenderService:
-    # TODO: make method to render individual checks
-
     @staticmethod
     def render_menu(start: bool, name: str = "default") -> str:
         res = ""
@@ -14,15 +11,14 @@ class RenderService:
             res += f"🖖 Привет, {name}. Я <b>CheckCheque</b> бот, вот что я умею:\n"
         res += (
             "\n🔸Просмотр последнего чека\n"
-            "🔸Статистика за год/месяц/неделю\n"
+            "🔸Статистика за неделю/месяц/год\n"
             "🔸Обработка новых чеков\n"
             "🔸Выгрузка существующей БД\n\n"
             "Для выбора действия нажми на соответствующую кнопку."
         )
         return res
 
-    @staticmethod
-    def render_statistics(items: list, period: str) -> str:
+    def render_statistics(self, items: list, period: str) -> str:
         months = utils.MONTHS
 
         if not items:
@@ -31,8 +27,14 @@ class RenderService:
         match period:
             case "year":
                 for month in items:
-                    res += f"<b>{months[month[2]]}</b>\nПоходов в магаз: {month[1]}\nПотрачено: {month[0]}\n\n"
-                res += f"------------------------------\nПотрачено за год: {sum([month[0] for month in items]):.2f}\n"
+                    res += (
+                        f"<b>{months[month[2]]}</b>\nПоходов в магаз: {month[1]}"
+                        f"\nПотрачено: {month[0]}\n\n"
+                    )
+                res += (
+                    f"------------------------------\nПотрачено за год: "
+                    f"{sum([month[0] for month in items]):.2f}\n"
+                )
                 return res
             case "month":
                 res = f'{months[str(datetime.now().month).rjust(2, "0")]}\n\n'
@@ -46,37 +48,45 @@ class RenderService:
 
                 return res
             case "week":
-                n, summ, total = 0, 0, 0
-                for indx, item in enumerate(items):
-                    if indx == 0 or indx > 0 and items[indx - 1][4] != item[4]:
-                        if indx != 0:
-                            res += f"------------------\n<b>Сумма: </b> {summ:.2f}\n------------------\n\n"
-                            total += summ
-                            summ = 0
-                        date, time = item[4].split()
-                        date = ".".join(date.split("-")[::-1])
-                        res += f"🗓️ {date}\n🕓 {time}\n\n"
-                        n = 0
-
-                    n += 1
-                    if item[2] != 1:
-                        res += f"<b>{n}) {item[0]}</b>\nЦена за ед.: {item[1]}\nКоличество: {item[2]}\nСумма: {item[3]}\n\n"
-
-                    else:
-                        res += f"<b>{n}) {item[0]}</b>\nЦена: {item[3]}\n\n"
-                    summ += float(item[3])
-                res += f"------------------\n<b>Сумма: </b> {summ:.2f}\n------------------\n\n"
-                total += summ
-                res += f"-----------------\n<b>Итого</b>: {total:.2f}\n"
-                return res
+                return self.render_checks(items, total=True)
             case "last":
-                date, time = (
-                    datetime.strptime(items[0][4], "%Y-%m-%d %H:%M")
-                    .strftime(DATE_FORMAT)
-                    .split()
+                return self.render_checks(items)
+
+    @staticmethod
+    def render_checks(items: list[tuple], total: bool = False) -> str:
+        result = ""
+        num = _sum = 0
+        if total:
+            _total = 0
+        for indx, item in enumerate(items):
+            if indx == 0 or indx > 0 and items[indx - 1][4] != item[4]:
+                if indx != 0:
+                    result += (
+                        f"------------------\n<b>Сумма: </b> "
+                        f"{_sum:.2f}\n------------------\n\n"
+                    )
+                    if total:
+                        _total += _sum
+                    _sum = 0
+                date, time = item[4].split()
+                date = ".".join(date.split("-")[::-1])
+                result += f"🗓️ {date}\n🕓 {time}\n\n"
+                num = 0
+
+            num += 1
+            if item[2] != 1:
+                result += (
+                    f"<b>{num}) {item[0]}</b>\nЦена за ед.: {item[1]}\n"
+                    f"Количество: {item[2]}\nСумма: {item[3]}\n\n"
                 )
-                res = f"🗓️{date}\n🕓{time}\n\n"
-                for item in items:
-                    res += f"<b>{item[0]}</b>\nЦена за ед.: {item[1]}\nКоличество: {item[2]}\nСумма: {item[3]}\n\n"
-                res += f"---------------------\n<b>Итого</b>: {sum([item[3] for item in items])}\n---------------------\n"
-                return res
+
+            else:
+                result += f"<b>{num}) {item[0]}</b>\nЦена: {item[3]}\n\n"
+            _sum += float(item[3])
+        result += (
+            f"------------------\n<b>Сумма: </b> {_sum:.2f}\n------------------\n\n"
+        )
+        if total:
+            _total += _sum
+            result += f"-----------------\n<b>Итого</b>: {_total:.2f}\n"
+        return result
