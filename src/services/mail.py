@@ -32,7 +32,7 @@ class MailService:
     def _search(self, criteria: str, folder: str) -> str | bool:
         """
         search for messages matching the given criteria in the given folder
-        returns uid-ready concatenated string of email uids or False
+        returns uid-method-ready concatenated string of email uids or False
         """
         self._select_mailbox(folder)
 
@@ -126,8 +126,8 @@ class MailService:
                     res.append(
                         (
                             name,
-                            price,
-                            amount,
+                            float(price),
+                            float(amount),
                             round(float(price) * float(amount), 2),
                             formatted_date,
                         )
