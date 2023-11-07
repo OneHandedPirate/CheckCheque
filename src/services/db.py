@@ -74,7 +74,7 @@ class DBService:
     @staticmethod
     def _year_statistics_query() -> str:
         return f"""SELECT
-                    ROUND(SUM(price), 2),
+                    ROUND(SUM(total), 2),
                     COUNT(DISTINCT created_at),
                     strftime('%m', created_at)
                     FROM {DB_NAME}
