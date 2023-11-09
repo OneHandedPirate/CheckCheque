@@ -21,8 +21,8 @@ class BotService:
             else None
         )
 
-    def get_menu(self, start: bool, name: str = "default"):
-        return self.render.render_menu(start, name)
+    def get_menu_text(self, start: bool, name: str = "default"):
+        return self.render.render_menu_text(start, name)
 
     def check_new_checks(self) -> str:
         new_items = self.mail.process_checks("UNSEEN", "Inbox")
@@ -38,3 +38,7 @@ class BotService:
     def get_statistics(self, period: str) -> str:
         items = self.db.get_statistics(period)
         return self.render.render_statistics(items, period)
+
+    def get_last_check(self):
+        items = self.db.get_last_check()
+        return self.render.render_checks(items)
