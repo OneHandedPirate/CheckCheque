@@ -17,6 +17,7 @@ from src.services.keyboads import (
     stats_keyboard_ikb,
 )
 from src.services.main import BotService
+from src.services.utils import validate_date_input
 
 dp = Dispatcher()
 bs = BotService()
@@ -81,10 +82,10 @@ async def stats_callback(query: CallbackQuery):
 
 
 @dp.message(DateState.waiting_for_date_input)
-async def process_stats_input(message: Message, state: FSMContext):
+async def process_date_input(message: Message, state: FSMContext):
     date_to_parse = message.text
     await message.answer(
-        f"Вы ввели: {date_to_parse}", reply_markup=stats_back_ikb.as_markup()
+        validate_date_input(date_to_parse), reply_markup=stats_back_ikb.as_markup()
     )
     await state.clear()
 

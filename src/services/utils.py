@@ -1,3 +1,5 @@
+import datetime
+
 MONTHS = {
     "01": "❄️ Январь",
     "02": "🌨 Февраль",
@@ -12,3 +14,20 @@ MONTHS = {
     "11": "☕ Ноябрь",
     "12": "🎄 Декабрь",
 }
+
+
+def validate_date_input(date_string):
+    current_date = datetime.datetime.today()
+
+    formats = ["%d.%m.%Y", "%m.%Y", "%Y"]
+
+    for date_format in formats:
+        try:
+            date = datetime.datetime.strptime(date_string, date_format)
+            if current_date < date or date.year < 2020:
+                raise ValueError
+            return date_string
+        except ValueError:
+            pass
+
+    return "Некорректный формат даты"
