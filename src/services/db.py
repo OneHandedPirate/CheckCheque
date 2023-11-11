@@ -71,7 +71,7 @@ class DBService:
     @staticmethod
     def _month_statistics_query() -> str:
         return f"""
-            SELECT name, SUM(amount), Round(SUM(total), 2)
+            SELECT name, SUM(amount), Round(SUM(total), 2), strftime('%m.%Y', created_at)
             FROM {DB_NAME}
             WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', ?)
             GROUP BY name

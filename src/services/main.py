@@ -6,6 +6,9 @@ from src.services.render import RenderService
 
 
 class BotService:
+    # TODO add statistics pagination,
+    #  encapsulate inline buttons into this class
+
     MONTHS = utils.MONTHS
 
     def __init__(self):
@@ -37,6 +40,23 @@ class BotService:
 
     def get_statistics(self, period: str) -> str:
         items = self.db.get_statistics(period)
+        return self.render.render_statistics(items, period)
+
+    def get_custom_statistics(self, date_string: str) -> str:
+        period = date = None
+        date_lst = [i.rjust(2, "0") for i in date_string.split(".")]
+        match len(date_lst):
+            case 3:
+                period = "day"
+                date = "-".join(date_lst[::-1])
+            case 2:
+                period = "month"
+                date = "-".join(date_lst[::-1] + ["01"])
+            case 1:
+                period = "year"
+                date = "-".join(date_lst[::-1] + (["01"] * 2))
+        date += " 00:00"
+        items = self.db.get_statistics(period, date)
         return self.render.render_statistics(items, period)
 
     def get_last_check(self):

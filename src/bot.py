@@ -83,11 +83,20 @@ async def stats_callback(query: CallbackQuery):
 
 @dp.message(DateState.waiting_for_date_input)
 async def process_date_input(message: Message, state: FSMContext):
-    date_to_parse = message.text
-    await message.answer(
-        validate_date_input(date_to_parse), reply_markup=stats_back_ikb.as_markup()
-    )
-    await state.clear()
+    date_string = message.text
+    if validate_date_input(date_string):
+        await message.answer(
+            bs.get_custom_statistics(date_string),
+            reply_markup=stats_back_ikb.as_markup(),
+        )
+        await state.clear()
+    else:
+        await message.answer(
+            "❗️Некорректный формат даты❗️\n\n"
+            "Попробуйте еще раз или нажмите кнопку Назад для перехода в меню статистики",
+            reply_markup=stats_back_ikb.as_markup(),
+        )
+        await state.set_state(DateState.waiting_for_date_input)
 
 
 async def main() -> None:
