@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from src.services import utils
 
 
@@ -39,17 +37,19 @@ class RenderService:
                 )
                 return "".join(strings_to_render)
             case "month":
-                strings_to_render.append(
-                    f'{months[str(datetime.now().month).rjust(2, "0")]}\n\n'
-                )
-                summ = 0
+                month, year = items[0][-1].split(".")
+                strings_to_render.append(f"{months[month]} {year}г.\n\n")
+                total = 0
                 for indx, item in enumerate(items, 1):
-                    summ += item[2]
-                    strings_to_render.append(
-                        f"<b>{item[0]}</b>\nКоличество: {item[1]}\nСумма: {item[2]}\n\n"
-                    )
+                    item_str = ""
+                    total += item[2]
+                    item_str += f"<b>- {item[0]}</b>\n"
+                    if item[1] != 1:
+                        item_str += f"   Количество: {item[1]}\n"
+                    item_str += f"   Сумма: {item[2]}\n"
+                    strings_to_render.append(item_str)
                 strings_to_render.append(
-                    f"-------------------------\n<b>Итого</b>: {summ:.2f}"
+                    f"-------------------------\n<b>Итого</b>: {total:.2f}"
                 )
 
                 return "".join(strings_to_render)
@@ -57,44 +57,49 @@ class RenderService:
                 return self.render_checks(items, total=True)
             case "last":
                 return self.render_checks(items)
+            case "day":
+                return self.render_checks(items, total=True)
 
     @staticmethod
     def render_checks(items: list[tuple], total: bool = False) -> str:
-        strings_to_render = []
+        checks_to_render = []
         num = _sum = 0
         if total:
             _total = 0
+        check_str = ""
         for indx, item in enumerate(items):
             if indx == 0 or indx > 0 and items[indx - 1][4] != item[4]:
                 if indx != 0:
-                    strings_to_render.append(
+                    check_str += (
                         f"------------------\n<b>Сумма: </b> "
                         f"{_sum:.2f}\n------------------\n\n"
                     )
                     if total:
                         _total += _sum
                     _sum = 0
+                    checks_to_render.append(check_str)
+                    check_str = ""
                 date, time = item[4].split()
                 date = ".".join(date.split("-")[::-1])
-                strings_to_render.append(f"🗓️ {date}\n🕓 {time}\n\n")
+                check_str += f"🗓️ {date}\n🕓 {time}\n\n"
                 num = 0
 
             num += 1
             if item[2] != 1:
-                strings_to_render.append(
+                check_str += (
                     f"<b>{num}) {item[0]}</b>\nЦена за ед.: {item[1]}\n"
                     f"Количество: {item[2]}\nСумма: {item[3]}\n\n"
                 )
 
             else:
-                strings_to_render.append(
-                    f"<b>{num}) {item[0]}</b>\nЦена: {item[3]}\n\n"
-                )
+                check_str += f"<b>{num}) {item[0]}</b>\nЦена: {item[3]}\n\n"
+
             _sum += float(item[3])
-        strings_to_render.append(
+        check_str += (
             f"------------------\n<b>Сумма: </b> {_sum:.2f}\n------------------\n\n"
         )
+        checks_to_render.append(check_str)
         if total:
             _total += _sum
-            strings_to_render.append(f"-----------------\n<b>Итого</b>: {_total:.2f}\n")
-        return "".join(strings_to_render)
+            checks_to_render.append(f"-----------------\n<b>Итого</b>: {_total:.2f}\n")
+        return "".join(checks_to_render)
