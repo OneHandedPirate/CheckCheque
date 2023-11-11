@@ -26,8 +26,8 @@ def validate_date_input(date_string):
             date = datetime.datetime.strptime(date_string, date_format)
             if current_date < date or date.year < 2020:
                 raise ValueError
-            return date_string
+            return True
         except ValueError:
             pass
 
-    return "Некорректный формат даты"
+    return False
