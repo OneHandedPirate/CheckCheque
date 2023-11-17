@@ -27,14 +27,15 @@ menu_main_ikb.add(
 menu_main_ikb.adjust(2, 1, 1)
 
 
-def get_stats_page_buttons(pages: int) -> InlineKeyboardBuilder:
+def get_stats_page_buttons(pages: int, current_page: int) -> InlineKeyboardBuilder:
     page_buttons = InlineKeyboardBuilder()
     page_buttons.add(
         *[
             InlineKeyboardButton(text=f"{page}", callback_data=f"page_{page}")
             for page in range(1, pages + 1)
+            if page != current_page
         ],
         InlineKeyboardButton(text="Назад", callback_data="menu_stats"),
     )
-    page_buttons.adjust(pages, 1)
+    page_buttons.adjust(pages - 1, 1)
     return page_buttons

@@ -82,6 +82,6 @@ class BotService:
         return {
             "text": self.pages[user_id][page - 1],
             "reply_markup": get_stats_page_buttons(
-                len(self.pages[user_id])
+                len(self.pages[user_id]), page
             ).as_markup(),
         }
