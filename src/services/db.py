@@ -82,7 +82,8 @@ class DBService:
         return f"""SELECT
                     ROUND(SUM(total), 2),
                     COUNT(DISTINCT created_at),
-                    strftime('%m', created_at)
+                    strftime('%m', created_at),
+                    strftime('%Y', created_at)
                     FROM {DB_NAME}
                     WHERE strftime('%Y', created_at) = strftime('%Y', ?)
                     GROUP BY strftime('%m', created_at);"""
