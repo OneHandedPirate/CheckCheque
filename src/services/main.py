@@ -1,9 +1,12 @@
-from pprint import pprint
-
 from src.config import LABEL
 from src.services import utils
 from src.services.db import DBService
-from src.services.keyboads import get_stats_page_buttons, menu_main_ikb, stats_back_ikb
+from src.services.keyboads import (
+    get_page_buttons,
+    menu_back_ikb,
+    menu_main_ikb,
+    stats_back_ikb,
+)
 from src.services.mail import MailService
 from src.services.render import RenderService
 
@@ -31,23 +34,32 @@ class BotService:
             "reply_markup": menu_main_ikb.as_markup(),
         }
 
-    def check_new_checks(self) -> str:
+    def check_new_checks(self, user_id: int) -> dict:
         new_items = self.mail.process_checks("UNSEEN", "Inbox")
 
         if new_items:
+
             self.db.insert_new_items(new_items)
-            return self.render.render_checks(
+            res = self.render.render_checks(
                 items=new_items,
                 first_string=f"Обработано новых чеков: {len(set([i[4] for i in new_items]))}\n\n",
             )
-        return "Новых чеков нет!"
+            if isinstance(res, list):
+                self.pages[user_id] = res
+                return self.get_paginated_results(user_id, main_menu=True)
+            return {"text": res, "reply_markup": menu_back_ikb.as_markup()}
+        else:
+            return {
+                "text": "Новых чеков нет",
+                "reply_markup": menu_back_ikb.as_markup(),
+            }
 
     def get_statistics(self, period: str, user_id: int) -> str | dict:
         items = self.db.get_statistics(period)
         res = self.render.render_statistics(items, period)
         if isinstance(res, list):
             self.pages[user_id] = res
-            return self.get_paginated_stats(user_id)
+            return self.get_paginated_results(user_id)
         return {"text": res, "reply_markup": stats_back_ikb.as_markup()}
 
     def get_custom_statistics(self, date_string: str, user_id: int) -> str | dict:
@@ -68,20 +80,21 @@ class BotService:
         res = self.render.render_statistics(items, period)
         if isinstance(res, list):
             self.pages[user_id] = res
-            pprint(self.pages)
-            return self.get_paginated_stats(user_id)
+            return self.get_paginated_results(user_id)
         return {"text": res, "reply_markup": stats_back_ikb.as_markup()}
 
     def get_last_check(self):
         items = self.db.get_last_check()
         return self.render.render_checks(items, first_string="🛒 Ваш последний чек:\n\n")
 
-    def get_paginated_stats(self, user_id: int, page: int = 1):
+    def get_paginated_results(
+        self, user_id: int, page: int = 1, main_menu: bool = False
+    ):
         if not self.pages.get(user_id):
             return {"text": "Страниц нет", "reply_markup": stats_back_ikb.as_markup()}
         return {
             "text": self.pages[user_id][page - 1],
-            "reply_markup": get_stats_page_buttons(
-                len(self.pages[user_id]), page
+            "reply_markup": get_page_buttons(
+                len(self.pages[user_id]), page, main_menu
             ).as_markup(),
         }

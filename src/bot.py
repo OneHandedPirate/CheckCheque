@@ -43,9 +43,7 @@ async def menu_callback(query: CallbackQuery, state: FSMContext) -> None:
     menu_item = query.data.split("_")[1]
     match menu_item:
         case "process":
-            await query.message.edit_text(
-                bs.check_new_checks(), reply_markup=menu_back_ikb.as_markup()
-            )
+            await query.message.edit_text(**bs.check_new_checks(query.from_user.id))
             await state.clear()
         case "stats":
             await query.message.edit_text(
@@ -79,10 +77,12 @@ async def stats_callback(query: CallbackQuery):
 @dp.callback_query(F.data.startswith("page_"))
 async def pagination_callback(query: CallbackQuery):
     try:
+
         page_num = int(query.data.split("_")[1])
-        await query.message.edit_text(
-            **bs.get_paginated_stats(query.from_user.id, page_num)
-        )
+        args = [query.from_user.id, page_num]
+        if len(query.data.split("_")) == 3:
+            args.append(True)
+        await query.message.edit_text(**bs.get_paginated_results(*args))
     except TelegramBadRequest as e:
         print(e)
 
